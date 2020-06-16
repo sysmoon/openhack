@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: userprofile
+spec:
+  selector:
+    matchLabels:
+      app: userprofile
+  template:
+    metadata:
+      labels:
+        app: userprofile
+    spec:
+      containers:
+      - name: userprofile
+        image: registrybnt1510.azurecr.io/tripinsights/userprofile:1.0
+        imagePullPolicy: "Always"
+        env:
+          - name: SQL_USER
+            value: sqladmingUx2831
+          - name: SQL_PASSWORD
+            value: oF1jz9Ti4
+          - name: SQL_SERVER
+            value: sqlservergux2831.database.windows.net
+          - name: SQL_DBNAME
+            value: mydrivingDB
+        ports:
+        - containerPort: 80
+      imagePullSecrets:
+        - name: acr-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: userprofile
+spec:
+  type: ClusterIP
+  selector:
+    app: userprofile
+  ports:
+  - port: 8080
+    targetPort: 80

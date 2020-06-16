@@ -1,0 +1,120 @@
+### az login
+az login -u hacker1c4u@OTAPRD1409ops.onmicrosoft.com
+
+### select subscription
+az account list --all
+az account set --subscription "your subscription id"
+az account show
+
+### create service principal
+az ad sp create-for-rbac --skip-assignment
+# {
+#   "appId": "6e43cf6a-57b7-4845-9a40-5e5908ea217c",
+#   "displayName": "azure-cli-2020-06-16-06-27-26",
+#   "name": "http://azure-cli-2020-06-16-06-27-26",
+#   "password": "80b13b43-8cff-4942-935d-e132ddc0cbfd",
+#   "tenant": "fbab49cc-0ec1-4c54-9449-a3af2f119f13"
+# }
+
+APPID='6e43cf6a-57b7-4845-9a40-5e5908ea217c'
+CLIENTSECRET='80b13b43-8cff-4942-935d-e132ddc0cbfd'
+### create unique identifier suffic for resources
+#UNIQUE_SUFFIX=$USER$RANDOM
+UNIQUE_SUFFIX='skt-openhack'
+
+### Remove Underscores and Dashes (Not Allowed in AKS and ACR Names)
+UNIQUE_SUFFIX="${UNIQUE_SUFFIX//_}"
+UNIQUE_SUFFIX="${UNIQUE_SUFFIX//-}"
+# Check Unique Suffix Value (Should be No Underscores or Dashes)
+echo $UNIQUE_SUFFIX
+# Persist for Later Sessions in Case of Timeout
+echo export UNIQUE_SUFFIX=$UNIQUE_SUFFIX >> ~/.zshrc
+
+### create azure rg
+# Set Resource Group Name using the unique suffix
+RGNAME=aks-rg-$UNIQUE_SUFFIX
+
+### Persist for Later Sessions in Case of Timeout
+echo export RGNAME=$RGNAME >> ~/.zshrc
+# Set Region (Location)
+LOCATION=koreacentral
+# Persist for Later Sessions in Case of Timeout
+echo export LOCATION=$LOCATION >> ~/.zshrc
+# Create Resource Group
+az group create -n $RGNAME -l $LOCATION
+
+### create AKS cluster
+# Set AKS Cluster Name
+CLUSTERNAME=aks${UNIQUE_SUFFIX}
+# Look at AKS Cluster Name for Future Reference
+echo $CLUSTERNAME
+# Persist for Later Sessions in Case of Timeout
+echo export CLUSTERNAME=aks${UNIQUE_SUFFIX} >> ~/.zshrc
+
+
+### get availalble k8s version
+az aks get-versions -l $LOCATION -o table
+
+# set k8s version
+K8SVERSION=1.16.9
+
+# check vm size in location
+az vm list-skus --location $LOCATION --output table
+
+# create aks cluster
+NODE_SIZE=Standard_B8ms
+az aks create -n $CLUSTERNAME -g $RGNAME \
+--kubernetes-version $K8SVERSION \
+--service-principal $APPID \
+--client-secret $CLIENTSECRET \
+--generate-ssh-keys -l $LOCATION \
+--node-count 3 \
+--node-vm-size $NODE_SIZE \
+--enable-addons monitoring \
+--no-wait
+
+# get aks cluster status
+az aks list -o table
+
+# Get the Kubernetes config files for your new AKS cluster
+az aks get-credentials -n $CLUSTERNAME -g $RGNAME
+
+# Verify you have API access to your new AKS cluster
+kubectl get nodes
+
+# cluster info
+kubectl cluster-info
+
+# namespace setup
+cd $PWD
+KUBE_HOME='/Users/sysmoon/lecture/k8s/openhack'
+echo $KUBE_HOME
+
+# create secret for ACR
+
+kubectl create secret docker-registry acr-secret \
+  --docker-server=https://registrybnt1510.azurecr.io \
+  --docker-username=registrybnt1510 \
+  --docker-password=vow8qDflQRQ5or4bR/ZfFCrPBBYs8YwK
+
+# # ACR login
+# docker login -u registrybnt1510 registrybnt1510.azurecr.io
+
+# # run container and go into shell
+# docker run --rm=true -it --name userprofile registrybnt1510.azurecr.io/tripinsights/userprofile:1.0 /bin/sh
+
+### deploy each component using deployemnt yaml file
+# userprofile
+kubectl apply -f openhack.userprofile.deployment.yaml
+# user-java
+kubectl apply -f openhack.user-java.deployment.yaml
+# trips
+kubectl apply -f openhack.trips.deployment.yaml
+# poi
+kubectl apply -f openhack.poi.deployment.yaml
+# tripviewer
+kubectl apply -f openhack.tripviewer.deployment.yaml
+
+### open browser and check tripviewer whether working well.
+kubectl get svc
+http://20.39.186.135:8080/

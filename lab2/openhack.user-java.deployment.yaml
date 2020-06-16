@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-java
+spec:
+  selector:
+    matchLabels:
+      app: user-java
+  template:
+    metadata:
+      labels:
+        app: user-java
+    spec:
+      containers:
+      - name: user-java
+        image: registrybnt1510.azurecr.io/tripinsights/user-java:1.0
+        imagePullPolicy: "Always"
+        env:
+          - name: SQL_USER
+            value: sqladmingUx2831
+          - name: SQL_PASSWORD
+            value: oF1jz9Ti4
+          - name: SQL_SERVER
+            value: sqlservergux2831.database.windows.net
+          - name: SQL_DBNAME
+            value: mydrivingDB
+        ports:
+        - containerPort: 80
+      imagePullSecrets:
+        - name: acr-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-java
+spec:
+  type: ClusterIP
+  selector:
+    app: user-java
+  ports:
+  - port: 8080
+    targetPort: 80
