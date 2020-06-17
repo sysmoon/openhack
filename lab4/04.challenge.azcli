@@ -1,0 +1,57 @@
+
+
+# az login -u hacker3en4@OTAPRD1409ops.onmicrosoft.com
+az account show
+
+CLUSTERNAME="akssktopenhack3"
+RGNAME="aks-rg-sktopenhack"
+
+
+### service principal search and delete
+# az ad app list --display-name myakscluster | jq -r '.[].appId'
+# az ad sp delete --id 7770b92c-e667-4b9f-bab6-69360a939274
+# az ad sp delete --id a67c19eb-33f8-45c9-83ef-d9cc62958d92
+# az ad sp delete --id 39713215-42bd-4bc6-84c4-daa629e5fce4
+# az ad sp delete --id 6c8e1892-456b-444f-a83e-52da52f7eb06
+# az ad sp delete --id 5b5c40bd-ea0f-48ea-811c-47755078e52b
+# az ad sp delete --id 2a6aa1ae-ebed-4e8f-a8b8-2e5572040ef3
+# az ad sp delete --id dd8d701b-095a-4d90-adad-b996ea31371a
+# az ad sp delete --id 8aa24d9c-96ee-44d0-936e-36dc47447156
+# az ad sp delete --id 5582f701-b441-4e6a-ba8b-bf606de1c14e
+
+
+serverApplicationId=$(az ad app list \
+    --display-name "${CLUSTERNAME}Server" \
+    --query "[0].appId"\
+    -o tsv)
+
+
+kubectl create -f https://raw.githubusercontent.com/Azure/kubernetes-keyvault-flexvol/master/deployment/kv-flexvol-installer.yaml
+
+kubectl get pods -n kv
+
+kubectl apply -f https://raw.githubusercontent.com/Azure/kubernetes-keyvault-flexvol/master/deployment/kv-flexvol-psp.yaml
+
+
+#### OPTION 1: Service principal (ref : https://microsoft.github.io/AzureTipsAndTricks/blog/tip245.html)
+
+## Lab2 에서 생성했을때의 password
+CLIENTID=8b134a24-8509-473a-9c7a-5fcc6d71b261
+CLIENTSECRET=AQvKgaF8kZoE5uzZQdAGayWTW_lM_h4PnH
+kubectl create secret generic kvcreds --from-literal clientid=${CLIENTID} --from-literal clientsecret=${CLIENTSECRET} --type=azure/kv
+
+
+principalid=${serverApplicationId}
+subscriptionid=4832ceb2-4885-4cab-ad9c-7378766b082f
+KV_NAME=kv-sktopenhack
+# [Required for version < v0.0.13] Assign Reader Role to the service principal for your keyvault
+az role assignment create --role Reader --assignee ${principalid} --scope /subscriptions/${subscriptionid}/resourcegroups/${RGNAME}/providers/Microsoft.KeyVault/vaults/${KV_NAME}
+
+
+# Assign key vault permissions to your service principal
+az keyvault set-policy -n $KV_NAME --key-permissions get --spn ${principalid}
+az keyvault set-policy -n $KV_NAME --secret-permissions get --spn ${principalid}
+az keyvault set-policy -n $KV_NAME --certificate-permissions get --spn ${principalid}
+
+
+git clone git@github.com:Azure/kubernetes-keyvault-flexvol.git
