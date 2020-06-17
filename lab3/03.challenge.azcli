@@ -1,0 +1,109 @@
+
+# az login -u hacker3en4@OTAPRD1409ops.onmicrosoft.com
+
+az account show
+
+CLUSTERNAME="akssktopenhack3"
+RGNAME="aks-rg-sktopenhack"
+
+# Create the Azure AD application
+serverApplicationId=$(az ad app create \
+    --display-name "${CLUSTERNAME}Server" \
+    --identifier-uris "https://${CLUSTERNAME}Server" \
+    --query appId -o tsv)
+
+# Update the application group membership claims
+az ad app update --id $serverApplicationId --set groupMembershipClaims=All
+
+
+# Create a service principal for the Azure AD application
+az ad sp create --id $serverApplicationId
+
+# Get the service principal secret
+serverApplicationSecret=$(az ad sp credential reset \
+    --name $serverApplicationId \
+    --credential-description "AKSPassword" \
+    --query password -o tsv)
+
+
+az ad app permission add \
+    --id $serverApplicationId \
+    --api 00000003-0000-0000-c000-000000000000 \
+    --api-permissions e1fe6dd8-ba31-4d61-89e7-88639da4683d=Scope 06da0dbc-49e2-44d2-8312-53f166ab848a=Scope 7ab1d382-f21e-4acd-a863-ba3e13f7da61=Role
+
+az ad app permission grant --id $serverApplicationId --api 00000003-0000-0000-c000-000000000000
+
+az ad app permission admin-consent --id $serverApplicationId
+
+clientApplicationId=$(az ad app create \
+    --display-name "${CLUSTERNAME}Client" \
+    --native-app \
+    --reply-urls "https://${CLUSTERNAME}Client" \
+    --query appId -o tsv)
+
+az ad sp create --id $clientApplicationId
+
+
+oAuthPermissionId=$(az ad app show --id $serverApplicationId --query "oauth2Permissions[0].id" -o tsv)
+
+az ad app permission add --id $clientApplicationId --api $serverApplicationId --api-permissions ${oAuthPermissionId}=Scope
+az ad app permission grant --id $clientApplicationId --api $serverApplicationId
+
+
+az group create --name ${RGNAME} --location eastasia
+
+tenantId=$(az account show --query tenantId -o tsv)
+
+
+
+#### VNet
+subnetid=$(az network vnet subnet list \
+    --resource-group teamResources \
+    --vnet-name vnet \
+    --query "[0].id" --output tsv)
+
+# /subscriptions/4832ceb2-4885-4cab-ad9c-7378766b082f/resourceGroups/teamResources/providers/Microsoft.Network/virtualNetworks/vnet/subnets/vm-subnet
+
+echo ${subnetid}
+az aks create \
+    --resource-group ${RGNAME} \
+    --name $CLUSTERNAME \
+    --network-plugin azure \
+    --vnet-subnet-id ${subnetid} \
+    --node-count 3 \
+    --generate-ssh-keys \
+    --aad-server-app-id $serverApplicationId \
+    --aad-server-app-secret $serverApplicationSecret \
+    --aad-client-app-id $clientApplicationId \
+    --aad-tenant-id $tenantId 
+
+
+
+az aks get-credentials --resource-group ${RGNAME} --name $CLUSTERNAME --admin
+
+az ad signed-in-user show --query userPrincipalName -o tsv
+# hacker3en4@OTAPRD1409ops.onmicrosoft.com
+
+kubectl apply -f basic-azure-ad-binding.yaml
+
+az aks get-credentials --resource-group ${RGNAME} --name $CLUSTERNAME --overwrite-existing
+
+
+# k get po -A                                                                                 
+# To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code BECJK93DK to authenticate.
+# 
+# NAMESPACE     NAME                                    READY   STATUS    RESTARTS   AGE
+# kube-system   coredns-698c77c5d7-9gt4q                1/1     Running   0          6m23s
+# kube-system   coredns-698c77c5d7-9nf9f                1/1     Running   0          8m19s
+# kube-system   coredns-autoscaler-5ccb7f6c8f-7n9ns     1/1     Running   0          8m18s
+# kube-system   kube-proxy-hlfpw                        1/1     Running   0          6m39s
+# kube-system   kubernetes-dashboard-74d8c675bc-5xsvt   1/1     Running   0          8m18s
+# kube-system   metrics-server-7d654ddc8b-q6lpw         1/1     Running   0          8m19s
+# kube-system   tunnelfront-7fc4fb4d4d-pb7l2            1/1     Running   0          8m18s
+
+
+# az ad mfa... 도 가능
+
+### lab2 에서 아무거나 하나 배포하고 internal-vm 에 ping 을 날려서 기존에 만들었던 네트워크에 속했는지 확인
+# kubectl exec -it ...
+# > ping 10.0.2.4
