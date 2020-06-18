@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tripviewer
+  namespace: web-dev-ns
+spec:
+  selector:
+    matchLabels:
+      app: tripviewer
+  template:
+    metadata:
+      labels:
+        app: tripviewer
+    spec:
+      containers:
+      - name: tripviewer
+        image: registrybnt1510.azurecr.io/tripinsights/tripviewer:1.0
+        imagePullPolicy: "Always"
+        env:
+          - name: USERPROFILE_API_ENDPOINT
+            value: http://userprofile.default.svc.cluster.local:8080
+          - name: TRIPS_API_ENDPOINT
+            value: http://trips.default.svc.cluster.local:8080
+        ports:
+        - containerPort: 80
+      imagePullSecrets:
+        - name: acr-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tripviewer
+spec:
+  type: LoadBalancer
+  selector:
+    app: tripviewer
+  ports:
+  - port: 8080
+    targetPort: 80
