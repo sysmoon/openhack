@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: poi
+  namespace: api-dev-ns
+spec:
+  selector:
+    matchLabels:
+      app: poi
+  template:
+    metadata:
+      labels:
+        app: poi
+    spec:
+      containers:
+      - name: poi
+        image: registrybnt1510.azurecr.io/tripinsights/poi:1.0
+        imagePullPolicy: "Always"
+        env:
+          - name: SQL_USER
+            value: sqladmingUx2831
+          - name: SQL_PASSWORD
+            value: oF1jz9Ti4
+          - name: SQL_SERVER
+            value: sqlservergux2831.database.windows.net
+          - name: SQL_DBNAME
+            value: mydrivingDB
+          - name: ASPNETCORE_ENVIRONMENT
+            value: Production
+        ports:
+        - containerPort: 80
+      imagePullSecrets:
+        - name: acr-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: poi
+spec:
+  type: ClusterIP
+  selector:
+    app: poi
+  ports:
+  - port: 8080
+    targetPort: 80
