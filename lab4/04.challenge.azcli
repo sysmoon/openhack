@@ -27,10 +27,12 @@ serverApplicationId=$(az ad app list \
 
 
 kubectl create -f https://raw.githubusercontent.com/Azure/kubernetes-keyvault-flexvol/master/deployment/kv-flexvol-installer.yaml
+# kubectl delete -f https://raw.githubusercontent.com/Azure/kubernetes-keyvault-flexvol/master/deployment/kv-flexvol-installer.yaml
 
 kubectl get pods -n kv
 
 kubectl apply -f https://raw.githubusercontent.com/Azure/kubernetes-keyvault-flexvol/master/deployment/kv-flexvol-psp.yaml
+# kubectl delete -f https://raw.githubusercontent.com/Azure/kubernetes-keyvault-flexvol/master/deployment/kv-flexvol-psp.yaml
 
 
 #### OPTION 1: Service principal (ref : https://microsoft.github.io/AzureTipsAndTricks/blog/tip245.html)
@@ -55,3 +57,43 @@ az keyvault set-policy -n $KV_NAME --certificate-permissions get --spn ${princip
 
 
 git clone git@github.com:Azure/kubernetes-keyvault-flexvol.git
+
+### Write file...
+kubectl apply -f nginx-flex-kv.yaml
+# kubectl delete -f nginx-flex-kv.yaml
+
+kubectl get po
+
+
+
+# kubectl delete -f https://raw.githubusercontent.com/Azure/kubernetes-keyvault-flexvol/master/deployment/kv-flexvol-installer.yaml
+# kubectl delete -f https://raw.githubusercontent.com/Azure/kubernetes-keyvault-flexvol/master/deployment/kv-flexvol-psp.yaml
+# kubectl delete -f nginx-flex-kv.yaml
+
+
+########################################## INGRESS ######################################################################
+
+# Create a namespace for your ingress resources
+kubectl create namespace ingress-basic
+
+helm version
+# helm version 3 이상
+
+# Add the official stable repository
+helm repo add stable https://kubernetes-charts.storage.googleapis.com/
+
+# Use Helm to deploy an NGINX ingress controller
+helm install nginx-ingress stable/nginx-ingress \
+    --namespace ingress-basic \
+    --set controller.replicaCount=2 \
+    --set controller.nodeSelector."beta\.kubernetes\.io/os"=linux \
+    --set defaultBackend.nodeSelector."beta\.kubernetes\.io/os"=linux \
+    --set controller.service.externalTrafficPolicy=Local
+
+kubectl get service -l app=nginx-ingress --namespace ingress-basic
+
+kubectl apply -f aks-helloworld-one.yaml --namespace ingress-basic
+kubectl apply -f aks-helloworld-two.yaml --namespace ingress-basic
+
+kubectl apply -f hello-world-ingress.yaml
+
