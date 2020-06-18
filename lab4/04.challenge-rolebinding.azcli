@@ -1,0 +1,38 @@
+# az login -u hacker3en4@OTAPRD1409ops.onmicrosoft.com
+az account show
+
+CLUSTERNAME="akssktopenhack3"
+RGNAME="aks-rg-sktopenhack"
+
+### create namespace for web-dev, api-dev
+kubectl apply -f create-namespace.yaml
+
+### save aks cluster id
+AKS_ID=$(az aks show \
+    --resource-group ${RGNAME} \
+    --name ${CLUSTERNAME} \
+    --query id -o tsv)
+
+# save group id for web-dev, api-dev
+APIDEVGRP_ID=$(az ad group create --display-name api-devgroup --mail-nickname api-devgroup --query objectId -o tsv)
+### call made group id by api-dev azure portal
+# APIDEVGRP_ID=$(az ad group show --group api-grp --query objectId -o tsv)
+
+WEBDEVGRP_ID=$(az ad group create --display-name web-devgroup --mail-nickname web-devgroup --query objectId -o tsv)
+### call made group id for web-dev by azure portal
+# WEBDEVGRP_ID=$(az ad group show --group web-grp --query objectId -o tsv)
+
+### create role assignment for api-dev
+az role assignment create \
+  --assignee $APIDEVGRP_ID \
+  --role "Azure Kubernetes Service Cluster User Role" \
+  --scope $AKS_ID
+
+### create role assignment for web-dev
+az role assignment create \
+  --assignee $WEBDEVGRP_ID \
+  --role "Azure Kubernetes Service Cluster User Role" \
+  --scope $AKS_ID
+
+### apply role binding
+kubectl apply -f role-dev-namespace.yaml
